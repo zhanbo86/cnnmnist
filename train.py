@@ -49,12 +49,14 @@ def _train(path_to_train_tfrecords_file,num_train_examples, path_to_val_tfrecord
         w4 = init_weights([128 * 4 * 4, 625]) # FC 128 * 4 * 4 inputs, 625 outputs
         w_o = init_weights([625, 11])         # FC 625 inputs, 11 outputs (labels)
         
+        global_step = tf.Variable(0, name='global_step', trainable=False)
+        
         p_keep_conv = tf.placeholder("float")
         p_keep_hidden = tf.placeholder("float")
         py_x = model(X, w, w2, w3, w4, w_o, p_keep_conv, p_keep_hidden)
         
-        cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=py_x, labels=Y))
-        train_op = tf.train.RMSPropOptimizer(0.001, 0.9).minimize(cost)
+        loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=py_x, labels=Y))
+        train_op = tf.train.RMSPropOptimizer(0.001, 0.9).minimize(loss,global_step=global_step)
         predict_op = tf.argmax(py_x, 1)
 
         print num_train_examples
@@ -67,6 +69,10 @@ def _train(path_to_train_tfrecords_file,num_train_examples, path_to_val_tfrecord
         
         indices = tf.placeholder("uint8",[batch_size,1])
         var = tf.one_hot(indices,depth = 11,axis = 1)
+        
+        tf.summary.image('image', trX)
+        tf.summary.scalar('loss', loss)
+        summary = tf.summary.merge_all()
 #        
 #        
 #
@@ -85,15 +91,27 @@ def _train(path_to_train_tfrecords_file,num_train_examples, path_to_val_tfrecord
 #        teX = teX.reshape(-1, 28, 28, 1)  # 28x28x1 input img
         
         with tf.Session() as sess:
+            summary_writer = tf.summary.FileWriter(path_to_train_log_dir, sess.graph)
+            
+            
             # you need to initialize all variables
             sess.run(tf.global_variables_initializer())
             sess.run(tf.local_variables_initializer())
             coord = tf.train.Coordinator()
             threads = tf.train.start_queue_runners(sess=sess, coord=coord)
+            
+            saver = tf.train.Saver()
+            if path_to_restore_checkpoint_file is not None:
+                assert tf.train.checkpoint_exists(path_to_restore_checkpoint_file), \
+                    '%s not found' % path_to_restore_checkpoint_file
+                saver.restore(sess, path_to_restore_checkpoint_file)
+                print 'Model restored from file: %s' % path_to_restore_checkpoint_file
+
+
             print 'Start training'
 #            print trX.shape
         
-            for i in range(100000):
+            for i in range(20000):
 #                plt.imshow(trX.eval())
 #                plt.show()
 #                single,l = sess.run([trX,trY])
@@ -118,19 +136,22 @@ def _train(path_to_train_tfrecords_file,num_train_examples, path_to_val_tfrecord
 #                    img.save(cwd+str(j)+'_''Label_'+str(tr_y[j])+'.jpg')
 ##                    print ele,ele.shape,tr_y[j]
 #                
-#                
                 tr_x,tr_y = sess.run([trX,trY])
                 tr_y.resize(batch_size,1)
                 tr_y = sess.run(var,feed_dict={indices:tr_y})
                 tr_y.resize(batch_size,11)
                 
 #                tr_y = tr_y.reshape(-1,11)        
-                sess.run(train_op, feed_dict={X: tr_x, Y: tr_y,p_keep_conv: 0.8, p_keep_hidden: 0.5})
+                _, loss_val, summary_val, global_step_val=sess.run([train_op, loss, summary, global_step], 
+                                                                   feed_dict={X: tr_x, Y: tr_y,p_keep_conv: 0.8, p_keep_hidden: 0.5})
 
                 te_x,te_y = sess.run([teX,teY])
                 te_x = te_x.reshape(-1, 28, 28, 1)  # 28x28x1 input img
-                print(i, np.mean(te_y ==
-                                 sess.run(predict_op, feed_dict={X: te_x,p_keep_conv: 1.0,p_keep_hidden: 1.0})))
+                accuracy = np.mean(te_y ==sess.run(predict_op, feed_dict={X: te_x,p_keep_conv: 1.0,p_keep_hidden: 1.0}))
+                print(i, accuracy)
+                summary_writer.add_summary(summary_val, global_step=global_step_val)
+                path_to_latest_checkpoint_file = saver.save(sess, os.path.join(path_to_train_log_dir, 'latest.ckpt'))
+
 
             coord.request_stop()
             coord.join(threads)
@@ -221,8 +242,8 @@ def _train(path_to_train_tfrecords_file,num_train_examples, path_to_val_tfrecord
 
 
 def main(_):
-    path_to_train_tfrecords_file = os.path.join(FLAGS.data_dir, 'train.tfrecords')
-    path_to_val_tfrecords_file = os.path.join(FLAGS.data_dir, 'val.tfrecords')
+    path_to_train_tfrecords_file = os.path.join(FLAGS.data_dir, 'train_data/train.tfrecords')
+    path_to_val_tfrecords_file = os.path.join(FLAGS.data_dir, 'val_data/val.tfrecords')
     path_to_tfrecords_meta_file = os.path.join(FLAGS.data_dir, 'meta.json')
     path_to_train_log_dir = FLAGS.train_logdir
     path_to_restore_checkpoint_file = FLAGS.restore_checkpoint
