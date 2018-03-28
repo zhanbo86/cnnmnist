@@ -149,6 +149,7 @@ def _train(path_to_train_tfrecords_file,num_train_examples, path_to_val_tfrecord
                 te_x = te_x.reshape(-1, 28, 28, 1)  # 28x28x1 input img
                 accuracy = np.mean(te_y ==sess.run(predict_op, feed_dict={X: te_x,p_keep_conv: 1.0,p_keep_hidden: 1.0}))
                 print(i, accuracy)
+
                 summary_writer.add_summary(summary_val, global_step=global_step_val)
                 path_to_latest_checkpoint_file = saver.save(sess, os.path.join(path_to_train_log_dir, 'latest.ckpt'))
 

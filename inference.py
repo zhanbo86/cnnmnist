@@ -5,7 +5,7 @@ from PIL import Image
 import os 
 import numpy as np 
 
-tf.app.flags.DEFINE_string('image', './image/', 'Path to image file')
+tf.app.flags.DEFINE_string('image', '/home/zb/BoZhan/ocr_ws/src/easyocr/rec_char_img/', 'Path to image file')
 tf.app.flags.DEFINE_string('restore_checkpoint', './logs/train/latest.ckpt',
                            'Path to restore checkpoint (without postfix), e.g. ./logs/train/model.ckpt-100')
 FLAGS = tf.app.flags.FLAGS
@@ -20,9 +20,12 @@ def main(_):
     img_num = 1
     images = 0
     
-    
-    for img_name in os.listdir(path_to_image_file):
+    files = os.listdir(path_to_image_file)
+    files.sort()
+#    print files
+    for img_name in files:
         img_path = path_to_image_file+img_name 
+#        print img_name
         img=Image.open(img_path,'r')
 #        print img.size
 #        image = tf.image.decode_jpeg(tf.read_file(path_to_image_file), channels=1)
@@ -34,7 +37,7 @@ def main(_):
         if img_num==1:
             images = image
         else:
-            print images.shape
+#            print images.shape
             images = tf.concat([images,image],0)
         img_num = img_num +1
 #        image = tf.image.convert_image_dtype(image, dtype=tf.float32)
