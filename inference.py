@@ -1,9 +1,18 @@
 import tensorflow as tf
 from model import model
+from PIL import Image
 import time
 from PIL import Image
 import os 
 import numpy as np 
+import cv2 as cv
+import ctypes
+import stringSegment as stringSeg
+
+
+#so = ctypes.cdll.LoadLibrary
+#stringSeg = so("/home/zb/BoZhan/ocr_ws/devel/lib/libstrSeg.so")
+#from libstrSeg import getChars
 
 tf.app.flags.DEFINE_string('image', '/home/zb/BoZhan/ocr_ws/src/easyocr/rec_char_img/', 'Path to image file')
 tf.app.flags.DEFINE_string('restore_checkpoint', './logs/train/latest.ckpt',
@@ -22,18 +31,24 @@ def main(_):
     
     files = os.listdir(path_to_image_file)
     files.sort()
-#    print files
-    for img_name in files:
-        img_path = path_to_image_file+img_name 
-#        print img_name
-        img=Image.open(img_path,'r')
-#        print img.size
-#        image = tf.image.decode_jpeg(tf.read_file(path_to_image_file), channels=1)
-        
+    
+    img_name = files[0]
+    img_path = path_to_image_file+img_name
+    cvimg = cv.imread(img_path,0)
+    img = stringSeg.Mat.from_array(cvimg)
+    charVec = stringSeg.matVector()
+    charVec = stringSeg.getCharsMain(img)
+    print("the length of charVec is %d"%len(charVec))
+          
+    for index in range(len(charVec)):
+        img = np.asarray(charVec[index])
+        img = Image.fromarray(img)
         img = img.resize((28,28))
+#        cv.imshow('charVec',img)
+#        cv.waitKey(10000)
+        
         image = tf.reshape(img, [1,28, 28, 1])
         image = tf.image.convert_image_dtype(image, dtype=tf.int32)
-#        print image.shape
         if img_num==1:
             images = image
         else:
@@ -48,14 +63,6 @@ def main(_):
     print images.shape
 #    images.reshape(-1,28,28,1)
  
-#    image = tf.image.decode_bmp(tf.read_file(path_to_image_file), channels=3)
-##    image = tf.image.decode_jpeg(tf.read_file(path_to_image_file), channels=1)
-#    image = tf.image.resize_images(image, [54, 54])
-#    image = tf.reshape(image, [54, 54, 3])
-#    image = tf.image.convert_image_dtype(image, dtype=tf.float32)
-#    image = tf.multiply(tf.subtract(image, 0.5), 2)
-##    image = tf.image.resize_images(image, [54, 54])
-#    images = tf.reshape(image, [1, 54, 54, 3])
     
     X = tf.placeholder("float", [None, 28, 28, 1])
     Y = tf.placeholder("float", [None, 11])
